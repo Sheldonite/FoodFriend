@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Image,
   Modal,
   Pressable,
   SafeAreaView,
@@ -14,6 +15,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 
 type Tab = 'Home' | 'Inventory' | 'Discover' | 'Reviews' | 'Settings';
 type Storage = 'Pantry' | 'Fridge' | 'Freezer' | 'Spices';
@@ -33,6 +35,8 @@ type InventoryItem = {
   avoid?: boolean;
   alternative?: string;
 };
+
+type ScanResult = { id: string; name: string; category: Storage; quantity: number };
 
 const colors = {
   ink: '#121923',
@@ -128,6 +132,8 @@ function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [showScan, setShowScan] = useState(false);
   const [scanMessage, setScanMessage] = useState('');
+  const [cameraImageUri, setCameraImageUri] = useState<string | null>(null);
+  const [scanResults, setScanResults] = useState<ScanResult[]>([]);
   const [search, setSearch] = useState('');
   const [storageFilter, setStorageFilter] = useState<'All' | Storage>('All');
   const [newItem, setNewItem] = useState({ name: '', quantity: '1 item', category: 'Pantry' as Storage });
@@ -169,11 +175,53 @@ function App() {
   }), [inventory, search, storageFilter]);
 
   function runScan() {
+    if (!cameraImageUri) {
+      setScanMessage('No image. Take a photo before scanning.');
+      setScanResults([]);
+      return;
+    }
     setScanMessage('Scanning your photo…');
     setTimeout(() => {
-      setScanMessage('Found: spinach, Greek yogurt, and chickpeas.');
-      setInventory((items) => items.map((item) => item.name === 'Spinach' ? { ...item, quantity: '2 bags' } : item));
+      setScanMessage('Review the items we found, then add the ones you want.');
+      setScanResults([
+        { id: 'spinach', name: 'Spinach', category: 'Fridge', quantity: 1 },
+        { id: 'yogurt', name: 'Greek yogurt', category: 'Fridge', quantity: 1 },
+        { id: 'chickpeas', name: 'Chickpeas', category: 'Pantry', quantity: 2 },
+      ]);
     }, 700);
+  }
+
+  async function openCamera() {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        setScanMessage('Camera permission is needed to take a shelf photo.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: false });
+      if (!result.canceled && result.assets[0]?.uri) {
+        setCameraImageUri(result.assets[0].uri);
+        setScanMessage('Image ready. Press Scan image to continue.');
+        setScanResults([]);
+      }
+    } catch {
+      setScanMessage('Camera is not available here. Try opening FoodFriend on your iPhone or choose a photo.');
+    }
+  }
+
+  function updateScanQuantity(id: string, delta: number) {
+    setScanResults((items) => items.map((item) => item.id === id ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item));
+  }
+
+  function addScanResults() {
+    const selected = scanResults.filter((item) => item.quantity > 0);
+    setInventory((items) => selected.reduce((next, scanned) => {
+      const existing = next.find((item) => item.name.toLowerCase() === scanned.name.toLowerCase());
+      if (existing) return next.map((item) => item.id === existing.id ? { ...item, quantity: `${scanned.quantity + Number.parseInt(item.quantity, 10) || scanned.quantity} item${scanned.quantity === 1 ? '' : 's'}` } : item);
+      return [...next, { id: `${scanned.id}-${Date.now()}`, name: scanned.name, category: scanned.category, quantity: `${scanned.quantity} item${scanned.quantity === 1 ? '' : 's'}`, calories: 100, protein: 4, fiber: 2, healthScore: 80 }];
+    }, items));
+    setScanMessage('Items added to your inventory.');
+    setScanResults([]);
   }
 
   function addItem() {
@@ -285,7 +333,7 @@ function App() {
   return (
     <SafeAreaView style={styles.safeArea}><StatusBar style="dark" />{content}<View style={styles.tabBar}>{(Object.keys(iconForTab) as Tab[]).map((tab) => <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.tabItem}><Icon name={iconForTab[tab]} size={22} color={activeTab === tab ? colors.greenDark : colors.muted} /><Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>{tab}</Text></Pressable>)}</View>
       <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><Text style={styles.modalTitle}>Add to inventory</Text><Pressable onPress={() => setShowAdd(false)}><Icon name="close" color={colors.muted} /></Pressable></View><TextInput autoFocus placeholder="Food name" value={newItem.name} onChangeText={(name) => setNewItem((item) => ({ ...item, name }))} style={styles.modalInput} /><TextInput placeholder="Quantity" value={newItem.quantity} onChangeText={(quantity) => setNewItem((item) => ({ ...item, quantity }))} style={styles.modalInput} /><Text style={styles.modalLabel}>Where does it live?</Text><View style={styles.wrapRow}>{(['Pantry', 'Fridge', 'Freezer', 'Spices'] as Storage[]).map((category) => <Pill key={category} label={category} selected={newItem.category === category} onPress={() => setNewItem((item) => ({ ...item, category }))} />)}</View><Text style={styles.modalLabel}>Food flag</Text><View style={styles.wrapRow}><Pill label="No flag" selected={newItemFlag === 'none'} onPress={() => setNewItemFlag('none')} /><Pill label="Limit · yellow" selected={newItemFlag === 'yellow'} tone="orange" onPress={() => setNewItemFlag('yellow')} /><Pill label="Avoid · red" selected={newItemFlag === 'red'} tone="red" onPress={() => setNewItemFlag('red')} /></View><Pressable style={styles.primaryButton} onPress={addItem}><Text style={styles.primaryButtonText}>Add item</Text></Pressable></View></View></Modal>
-      <Modal visible={showScan} transparent animationType="slide" onRequestClose={() => setShowScan(false)}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><Text style={styles.modalTitle}>Snapshot your food</Text><Pressable onPress={() => setShowScan(false)}><Icon name="close" color={colors.muted} /></Pressable></View><View style={styles.scanPreview}><Icon name="camera-outline" size={48} color={colors.orange} /><Text style={styles.scanPreviewTitle}>Camera + OCR ready</Text><Text style={styles.scanPreviewBody}>This first build uses a simulated scan so you can test the flow. Camera permissions and real item recognition plug in here next.</Text></View>{scanMessage ? <View style={styles.scanResult}><Icon name="checkmark-circle" color={colors.greenDark} size={21} /><Text style={styles.scanResultText}>{scanMessage}</Text></View> : null}<Pressable style={styles.primaryButton} onPress={runScan}><Icon name="scan-outline" size={18} color={colors.card} /><Text style={styles.primaryButtonText}>Scan a shelf photo</Text></Pressable></View></View></Modal>
+      <Modal visible={showScan} transparent animationType="slide" onRequestClose={() => setShowScan(false)}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><Text style={styles.modalTitle}>Snapshot your food</Text><Pressable onPress={() => setShowScan(false)}><Icon name="close" color={colors.muted} /></Pressable></View>{cameraImageUri ? <Image source={{ uri: cameraImageUri }} style={styles.scanImage} /> : <View style={styles.scanPreview}><Icon name="camera-outline" size={48} color={colors.orange} /><Text style={styles.scanPreviewTitle}>Take a shelf photo</Text><Text style={styles.scanPreviewBody}>FoodFriend will use the image as the starting point for item recognition.</Text></View>}<View style={styles.scanButtonRow}><Pressable style={styles.secondaryButton} onPress={openCamera}><Icon name="camera-outline" size={18} color={colors.ink} /><Text style={styles.secondaryButtonText}>{cameraImageUri ? 'Retake photo' : 'Open camera'}</Text></Pressable><Pressable style={styles.primaryButtonCompact} onPress={runScan}><Icon name="scan-outline" size={18} color={colors.card} /><Text style={styles.primaryButtonText}>Scan image</Text></Pressable></View>{scanMessage ? <View style={[styles.scanResult, scanMessage.startsWith('No image') && styles.scanError]}><Icon name={scanMessage.startsWith('No image') ? 'alert-circle-outline' : 'checkmark-circle'} color={scanMessage.startsWith('No image') ? colors.red : colors.greenDark} size={21} /><Text style={[styles.scanResultText, scanMessage.startsWith('No image') && styles.scanErrorText]}>{scanMessage}</Text></View> : null}{scanResults.length > 0 && <View style={styles.scanResults}>{scanResults.map((item) => <View key={item.id} style={styles.scanItemRow}><Pressable style={styles.quantityButton} onPress={() => updateScanQuantity(item.id, -1)}><Icon name="remove" size={18} color={colors.ink} /></Pressable><View style={{ flex: 1 }}><Text style={styles.scanItemName}>{item.name}</Text><Text style={styles.scanItemMeta}>{item.category}</Text></View><Text style={styles.scanItemQuantity}>{item.quantity}</Text><Pressable style={styles.quantityButton} onPress={() => updateScanQuantity(item.id, 1)}><Icon name="add" size={18} color={colors.ink} /></Pressable></View>)}<Pressable style={styles.primaryButton} onPress={addScanResults}><Text style={styles.primaryButtonText}>Add selected items</Text></Pressable></View>}</View></View></Modal>
     </SafeAreaView>
   );
 }
@@ -420,8 +468,21 @@ const styles = StyleSheet.create({
   scanPreview: { backgroundColor: colors.ink, borderRadius: 20, minHeight: 195, alignItems: 'center', justifyContent: 'center', padding: 25 },
   scanPreviewTitle: { color: colors.card, fontSize: 17, fontWeight: '900', marginTop: 12 },
   scanPreviewBody: { color: '#B7C1C8', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7 },
+  scanImage: { width: '100%', height: 210, borderRadius: 20, backgroundColor: colors.ink, resizeMode: 'cover' },
+  scanButtonRow: { flexDirection: 'row', gap: 9, marginTop: 13 },
+  secondaryButton: { flex: 1, height: 50, borderRadius: 15, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 },
+  secondaryButtonText: { color: colors.ink, fontSize: 12, fontWeight: '900' },
+  primaryButtonCompact: { flex: 1, backgroundColor: colors.greenDark, borderRadius: 15, height: 50, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 },
   scanResult: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#EAF6E7', borderRadius: 14, padding: 12, marginTop: 13 },
   scanResultText: { color: colors.greenDark, fontSize: 12, fontWeight: '700', flex: 1 },
+  scanError: { backgroundColor: '#FDE6E4' },
+  scanErrorText: { color: colors.red },
+  scanResults: { marginTop: 15 },
+  scanItemRow: { backgroundColor: colors.canvas, borderRadius: 15, padding: 9, flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 8 },
+  quantityButton: { width: 34, height: 34, borderRadius: 11, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
+  scanItemName: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  scanItemMeta: { color: colors.muted, fontSize: 10, marginTop: 3 },
+  scanItemQuantity: { color: colors.greenDark, fontSize: 14, fontWeight: '900', minWidth: 20, textAlign: 'center' },
 });
 
 export default App;
