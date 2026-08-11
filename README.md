@@ -27,3 +27,9 @@ npm run web
 ```
 
 Then open the local URL Expo prints. On iPhone, open it in Expo Go. The current scan and recommendation data are local demo data; the next build can connect them to a camera/OCR service, nutrition database, user accounts, and shared reviews.
+
+## GitHub Pages
+
+The repository includes a GitHub Actions workflow that exports and deploys the web app whenever `main` is pushed. After the repository is connected and the workflow runs once, enable **Settings → Pages → Source: GitHub Actions**. The site will be available at:
+
+`https://sheldonite.github.io/FoodFriend/`

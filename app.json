@@ -29,6 +29,9 @@
       "bundler": "metro",
       "favicon": "./assets/icon.png"
     },
+    "experiments": {
+      "baseUrl": "/FoodFriend"
+    },
     "plugins": [
       "expo-asset"
     ]
