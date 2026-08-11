@@ -54,6 +54,14 @@ const allergens = [
   'Banana', 'Avocado', 'Sulfites', 'Pork', 'Beef', 'Chicken', 'Legumes',
 ];
 
+const redFlagIngredients = [
+  'Potassium bromate', 'Propyl paraben', 'Butylated hydroxyanisole (BHA)',
+  'Butylated hydroxytoluene (BHT)', 'Titanium dioxide', 'Yellow 5', 'Yellow 6',
+  'Red 3', 'Red 40', 'Blue 1', 'Blue 2', 'Green 3', 'Aspartame',
+  'Azodicarbonamide', 'Propyl gallate', 'Tertiary butylhydroquinone (TBHQ)',
+  'Sucralose', 'Sodium nitrate',
+];
+
 const initialInventory: InventoryItem[] = [
   { id: '1', name: 'Spinach', category: 'Fridge', quantity: '1 bag', calories: 23, protein: 3, fiber: 2, healthScore: 96 },
   { id: '2', name: 'Greek yogurt', category: 'Fridge', quantity: '3 cups', calories: 120, protein: 17, fiber: 0, healthScore: 87 },
@@ -103,6 +111,15 @@ function SectionTitle({ title, action, onAction }: { title: string; action?: str
 
 function flagForItem(item: InventoryItem): FlagLevel {
   return item.flag ?? (item.avoid ? 'red' : 'none');
+}
+
+function normalizeIngredient(value: string) {
+  return value.toLowerCase().replace(/[()\-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function matchedRedIngredient(value: string) {
+  const normalized = normalizeIngredient(value);
+  return redFlagIngredients.find((ingredient) => normalized.includes(normalizeIngredient(ingredient)));
 }
 
 function App() {
@@ -161,10 +178,12 @@ function App() {
 
   function addItem() {
     if (!newItem.name.trim()) return;
+    const matchedIngredient = matchedRedIngredient(newItem.name);
     setInventory((items) => [...items, {
       id: Date.now().toString(), name: newItem.name.trim(), quantity: newItem.quantity || '1 item', category: newItem.category,
-      calories: 100, protein: 4, fiber: 2, healthScore: newItemFlag === 'red' ? 45 : newItemFlag === 'yellow' ? 65 : 75,
-      flag: newItemFlag,
+      calories: 100, protein: 4, fiber: 2, healthScore: matchedIngredient || newItemFlag === 'red' ? 45 : newItemFlag === 'yellow' ? 65 : 75,
+      flag: matchedIngredient ? 'red' : newItemFlag,
+      flagReason: matchedIngredient ? `Watchlist ingredient · ${matchedIngredient}` : undefined,
     }]);
     setNewItem({ name: '', quantity: '1 item', category: 'Pantry' });
     setNewItemFlag('none');
@@ -254,6 +273,7 @@ function App() {
         <View style={styles.screenHeader}><View><Text style={styles.eyebrow}>MAKE IT YOURS</Text><Text style={styles.screenTitle}>Settings</Text></View><View style={styles.settingsMark}><Icon name="options" color={colors.card} size={18} /></View></View>
         <View style={styles.settingCard}><View style={styles.settingHeading}><View style={[styles.settingIcon, { backgroundColor: colors.lavender }]}><Icon name="sparkles-outline" color="#7565B5" /></View><View style={{ flex: 1 }}><Text style={styles.settingTitle}>Sensory-friendly mode</Text><Text style={styles.settingBody}>Tune recommendations for your comfort.</Text></View><Switch value={sensoryMode} onValueChange={setSensoryMode} trackColor={{ false: '#D9DEE2', true: '#B8E0B2' }} thumbColor={sensoryMode ? colors.greenDark : '#FFFFFF'} /></View><Text style={styles.settingPrompt}>What helps a place feel right?</Text><View style={styles.wrapRow}>{['Parking', 'Low Lighting', 'Loud', 'Calm Atmosphere'].map((need) => <Pill key={need} label={need} selected={sensoryNeeds.includes(need)} tone={need === 'Loud' ? 'red' : 'green'} onPress={() => toggleSensoryNeed(need)} />)}</View></View>
         <View style={styles.settingCard}><View style={styles.settingHeading}><View style={[styles.settingIcon, { backgroundColor: '#FDE6E4' }]}><Icon name="warning-outline" color={colors.red} /></View><View style={{ flex: 1 }}><Text style={styles.settingTitle}>Allergens & avoid list</Text><Text style={styles.settingBody}>{selectedAllergens.length} selected · used in every recommendation.</Text></View><Icon name="chevron-forward" color={colors.muted} /></View><Text style={styles.settingPrompt}>Select anything you avoid</Text><View style={styles.wrapRow}>{allergens.map((allergen) => <Pill key={allergen} label={allergen} selected={selectedAllergens.includes(allergen)} tone="red" onPress={() => toggleAllergen(allergen)} />)}</View></View>
+        <View style={styles.settingCard}><View style={styles.settingHeading}><View style={[styles.settingIcon, { backgroundColor: '#FDE6E4' }]}><Icon name="flag-outline" color={colors.red} /></View><View style={{ flex: 1 }}><Text style={styles.settingTitle}>Red-flag ingredient watchlist</Text><Text style={styles.settingBody}>Ingredient matches are automatically marked Avoid when added.</Text></View></View><View style={styles.wrapRow}>{redFlagIngredients.map((ingredient) => <Pill key={ingredient} label={ingredient} tone="red" />)}</View><Text style={styles.watchlistNote}>This is a configurable FoodFriend preference list, not a diagnosis or a substitute for professional dietary advice.</Text></View>
         <View style={styles.settingCard}><View style={styles.settingHeading}><View style={[styles.settingIcon, { backgroundColor: '#FFF0D4' }]}><Icon name="person-outline" color={colors.orange} /></View><View style={{ flex: 1 }}><Text style={styles.settingTitle}>Preferences</Text><Text style={styles.settingBody}>Diet style, goals, and notification choices.</Text></View><Icon name="chevron-forward" color={colors.muted} /></View><View style={styles.preferenceLine}><Text style={styles.preferenceLabel}>Diet style</Text><Text style={styles.preferenceValue}>Balanced <Icon name="chevron-forward" size={14} color={colors.muted} /></Text></View><View style={styles.preferenceLine}><Text style={styles.preferenceLabel}>Notifications</Text><Text style={styles.preferenceValue}>Helpful only <Icon name="chevron-forward" size={14} color={colors.muted} /></Text></View></View>
         <Text style={styles.version}>FoodFriend v1.0 · Made for better decisions</Text>
       </ScrollView>
@@ -378,6 +398,7 @@ const styles = StyleSheet.create({
   settingTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   settingBody: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: 3 },
   settingPrompt: { color: colors.ink, fontSize: 11, fontWeight: '800', marginTop: 18, marginBottom: 9 },
+  watchlistNote: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: 12 },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   preferenceLine: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 13, marginTop: 13, flexDirection: 'row', justifyContent: 'space-between' },
   preferenceLabel: { color: colors.ink, fontSize: 12, fontWeight: '700' },
