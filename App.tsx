@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { supabaseConfigured } from './lib/supabase';
 
 type Tab = 'Home' | 'Inventory' | 'Discover' | 'Reviews' | 'Settings';
 type Storage = 'Pantry' | 'Fridge' | 'Freezer' | 'Spices';
@@ -323,6 +324,7 @@ function App() {
         <View style={styles.settingCard}><View style={styles.settingHeading}><View style={[styles.settingIcon, { backgroundColor: '#FDE6E4' }]}><Icon name="warning-outline" color={colors.red} /></View><View style={{ flex: 1 }}><Text style={styles.settingTitle}>Allergens & avoid list</Text><Text style={styles.settingBody}>{selectedAllergens.length} selected · used in every recommendation.</Text></View><Icon name="chevron-forward" color={colors.muted} /></View><Text style={styles.settingPrompt}>Select anything you avoid</Text><View style={styles.wrapRow}>{allergens.map((allergen) => <Pill key={allergen} label={allergen} selected={selectedAllergens.includes(allergen)} tone="red" onPress={() => toggleAllergen(allergen)} />)}</View></View>
         <View style={styles.settingCard}><View style={styles.settingHeading}><View style={[styles.settingIcon, { backgroundColor: '#FDE6E4' }]}><Icon name="flag-outline" color={colors.red} /></View><View style={{ flex: 1 }}><Text style={styles.settingTitle}>Red-flag ingredient watchlist</Text><Text style={styles.settingBody}>Ingredient matches are automatically marked Avoid when added.</Text></View></View><View style={styles.wrapRow}>{redFlagIngredients.map((ingredient) => <Pill key={ingredient} label={ingredient} tone="red" />)}</View><Text style={styles.watchlistNote}>This is a configurable FoodFriend preference list, not a diagnosis or a substitute for professional dietary advice.</Text></View>
         <View style={styles.settingCard}><View style={styles.settingHeading}><View style={[styles.settingIcon, { backgroundColor: '#FFF0D4' }]}><Icon name="person-outline" color={colors.orange} /></View><View style={{ flex: 1 }}><Text style={styles.settingTitle}>Preferences</Text><Text style={styles.settingBody}>Diet style, goals, and notification choices.</Text></View><Icon name="chevron-forward" color={colors.muted} /></View><View style={styles.preferenceLine}><Text style={styles.preferenceLabel}>Diet style</Text><Text style={styles.preferenceValue}>Balanced <Icon name="chevron-forward" size={14} color={colors.muted} /></Text></View><View style={styles.preferenceLine}><Text style={styles.preferenceLabel}>Notifications</Text><Text style={styles.preferenceValue}>Helpful only <Icon name="chevron-forward" size={14} color={colors.muted} /></Text></View></View>
+        <View style={styles.settingCard}><View style={styles.settingHeading}><View style={[styles.settingIcon, { backgroundColor: '#E5F3E2' }]}><Icon name="cloud-outline" color={colors.greenDark} /></View><View style={{ flex: 1 }}><Text style={styles.settingTitle}>Cloud sync</Text><Text style={styles.settingBody}>{supabaseConfigured ? 'Supabase is connected for secure account data.' : 'Add your Supabase publishable key to enable account sync.'}</Text></View><View style={[styles.statusDot, { backgroundColor: supabaseConfigured ? colors.greenDark : colors.orange }]} /></View></View>
         <Text style={styles.version}>FoodFriend v1.0 · Made for better decisions</Text>
       </ScrollView>
     );
@@ -441,6 +443,7 @@ const styles = StyleSheet.create({
   stars: { flexDirection: 'row', gap: 1 },
   reviewNote: { color: colors.ink, fontSize: 12, lineHeight: 18, marginTop: 13 },
   settingCard: { backgroundColor: colors.card, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: colors.line, marginBottom: 13 },
+  statusDot: { width: 11, height: 11, borderRadius: 6 },
   settingHeading: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   settingIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   settingTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
