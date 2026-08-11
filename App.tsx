@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Tab = 'Home' | 'Inventory' | 'Discover' | 'Reviews' | 'Settings';
 type Storage = 'Pantry' | 'Fridge' | 'Freezer' | 'Spices';
+type FlagLevel = 'red' | 'yellow' | 'none';
 
 type InventoryItem = {
   id: string;
@@ -27,6 +28,8 @@ type InventoryItem = {
   protein: number;
   fiber: number;
   healthScore: number;
+  flag?: FlagLevel;
+  flagReason?: string;
   avoid?: boolean;
   alternative?: string;
 };
@@ -56,7 +59,7 @@ const initialInventory: InventoryItem[] = [
   { id: '2', name: 'Greek yogurt', category: 'Fridge', quantity: '3 cups', calories: 120, protein: 17, fiber: 0, healthScore: 87 },
   { id: '3', name: 'Chickpeas', category: 'Pantry', quantity: '2 cans', calories: 269, protein: 15, fiber: 12, healthScore: 92 },
   { id: '4', name: 'Frozen berries', category: 'Freezer', quantity: '1 bag', calories: 70, protein: 1, fiber: 4, healthScore: 94 },
-  { id: '5', name: 'White bread', category: 'Pantry', quantity: '½ loaf', calories: 266, protein: 9, fiber: 2, healthScore: 48, avoid: true, alternative: 'Whole grain bread' },
+  { id: '5', name: 'White bread', category: 'Pantry', quantity: '½ loaf', calories: 266, protein: 9, fiber: 2, healthScore: 48, flag: 'red', flagReason: 'Refined grain', avoid: true, alternative: 'Whole grain bread' },
   { id: '6', name: 'Smoked paprika', category: 'Spices', quantity: '1 jar', calories: 6, protein: 0, fiber: 1, healthScore: 85 },
 ];
 
@@ -98,6 +101,10 @@ function SectionTitle({ title, action, onAction }: { title: string; action?: str
   );
 }
 
+function flagForItem(item: InventoryItem): FlagLevel {
+  return item.flag ?? (item.avoid ? 'red' : 'none');
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('Home');
   const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
@@ -107,6 +114,7 @@ function App() {
   const [search, setSearch] = useState('');
   const [storageFilter, setStorageFilter] = useState<'All' | Storage>('All');
   const [newItem, setNewItem] = useState({ name: '', quantity: '1 item', category: 'Pantry' as Storage });
+  const [newItemFlag, setNewItemFlag] = useState<FlagLevel>('none');
   const [sensoryMode, setSensoryMode] = useState(true);
   const [sensoryNeeds, setSensoryNeeds] = useState(['Low Lighting', 'Calm Atmosphere']);
   const [selectedAllergens, setSelectedAllergens] = useState(['Milk', 'Peanuts']);
@@ -155,9 +163,11 @@ function App() {
     if (!newItem.name.trim()) return;
     setInventory((items) => [...items, {
       id: Date.now().toString(), name: newItem.name.trim(), quantity: newItem.quantity || '1 item', category: newItem.category,
-      calories: 100, protein: 4, fiber: 2, healthScore: 75,
+      calories: 100, protein: 4, fiber: 2, healthScore: newItemFlag === 'red' ? 45 : newItemFlag === 'yellow' ? 65 : 75,
+      flag: newItemFlag,
     }]);
     setNewItem({ name: '', quantity: '1 item', category: 'Pantry' });
+    setNewItemFlag('none');
     setShowAdd(false);
   }
 
@@ -207,8 +217,9 @@ function App() {
         <View style={styles.searchBox}><Icon name="search-outline" color={colors.muted} /><TextInput placeholder="Search your food" placeholderTextColor={colors.muted} value={search} onChangeText={setSearch} style={styles.searchInput} /></View>
         <View style={styles.filterRow}>{(['All', 'Pantry', 'Fridge', 'Freezer', 'Spices'] as const).map((filter) => <Pill key={filter} label={filter} selected={storageFilter === filter} onPress={() => setStorageFilter(filter)} />)}</View>
         <Pressable style={styles.scanBanner} onPress={() => setShowScan(true)}><View style={styles.scanBannerIcon}><Icon name="scan-outline" color={colors.orange} size={24} /></View><View style={{ flex: 1 }}><Text style={styles.scanTitle}>Snapshot your shelves</Text><Text style={styles.scanBody}>OCR + item recognition will update quantities for you.</Text></View><Icon name="chevron-forward" color={colors.orange} /></Pressable>
+        <View style={styles.flagLegend}><View style={styles.flagLegendItem}><View style={[styles.flagDot, { backgroundColor: colors.red }]} /><Text style={styles.flagLegendText}>Red · avoid</Text></View><View style={styles.flagLegendItem}><View style={[styles.flagDot, { backgroundColor: colors.orange }]} /><Text style={styles.flagLegendText}>Yellow · limit</Text></View><Text style={styles.flagLegendHint}>Tap an item to review</Text></View>
         <SectionTitle title={`${filteredInventory.length} items`} action="Nutrition view" onAction={() => Alert.alert('Nutrition at a glance', 'Your current inventory averages 82% healthy choices, 12g fiber per tracked serving, and 14g protein.')} />
-        {filteredInventory.map((item) => <View key={item.id} style={styles.inventoryCard}><View style={[styles.foodIcon, { backgroundColor: item.avoid ? '#FDE6E4' : '#E6F5E3' }]}><Text style={styles.foodEmoji}>{item.category === 'Spices' ? '🫙' : item.category === 'Freezer' ? '❄️' : item.category === 'Fridge' ? '🥬' : '🥫'}</Text></View><View style={{ flex: 1 }}><View style={styles.inventoryTitleRow}><Text style={styles.inventoryName}>{item.name}</Text>{item.avoid && <View style={styles.avoidBadge}><Text style={styles.avoidText}>AVOID</Text></View>}</View><Text style={styles.inventoryMeta}>{item.category} · {item.quantity}</Text><Text style={styles.inventoryNutrition}>{item.calories} cal  ·  {item.protein}g protein  ·  {item.fiber}g fiber</Text>{item.alternative && <Text style={styles.alternative}><Icon name="swap-horizontal-outline" size={13} color={colors.greenDark} /> Try {item.alternative}</Text>}</View><View style={styles.score}><Text style={styles.scoreNumber}>{item.healthScore}</Text><Text style={styles.scoreLabel}>score</Text></View></View>)}
+        {filteredInventory.map((item) => { const flag = flagForItem(item); return <View key={item.id} style={styles.inventoryCard}><View style={[styles.foodIcon, { backgroundColor: flag === 'red' ? '#FDE6E4' : flag === 'yellow' ? '#FFF0D4' : '#E6F5E3' }]}><Text style={styles.foodEmoji}>{item.category === 'Spices' ? '🫙' : item.category === 'Freezer' ? '❄️' : item.category === 'Fridge' ? '🥬' : '🥫'}</Text></View><View style={{ flex: 1 }}><View style={styles.inventoryTitleRow}><Text style={styles.inventoryName}>{item.name}</Text>{flag !== 'none' && <View style={[styles.avoidBadge, flag === 'yellow' && styles.limitBadge]}><Text style={[styles.avoidText, flag === 'yellow' && styles.limitText]}>{flag === 'red' ? 'AVOID' : 'LIMIT'}</Text></View>}</View><Text style={styles.inventoryMeta}>{item.category} · {item.quantity}</Text><Text style={styles.inventoryNutrition}>{item.calories} cal  ·  {item.protein}g protein  ·  {item.fiber}g fiber</Text>{item.flagReason && <Text style={styles.flagReason}>{flag === 'red' ? 'Avoid flag' : 'Limit flag'} · {item.flagReason}</Text>}{item.alternative && <Text style={styles.alternative}><Icon name="swap-horizontal-outline" size={13} color={colors.greenDark} /> Try {item.alternative}</Text>}</View><View style={styles.score}><Text style={styles.scoreNumber}>{item.healthScore}</Text><Text style={styles.scoreLabel}>score</Text></View></View>; })}
       </ScrollView>
     );
   }
@@ -253,7 +264,7 @@ function App() {
 
   return (
     <SafeAreaView style={styles.safeArea}><StatusBar style="dark" />{content}<View style={styles.tabBar}>{(Object.keys(iconForTab) as Tab[]).map((tab) => <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.tabItem}><Icon name={iconForTab[tab]} size={22} color={activeTab === tab ? colors.greenDark : colors.muted} /><Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>{tab}</Text></Pressable>)}</View>
-      <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><Text style={styles.modalTitle}>Add to inventory</Text><Pressable onPress={() => setShowAdd(false)}><Icon name="close" color={colors.muted} /></Pressable></View><TextInput autoFocus placeholder="Food name" value={newItem.name} onChangeText={(name) => setNewItem((item) => ({ ...item, name }))} style={styles.modalInput} /><TextInput placeholder="Quantity" value={newItem.quantity} onChangeText={(quantity) => setNewItem((item) => ({ ...item, quantity }))} style={styles.modalInput} /><Text style={styles.modalLabel}>Where does it live?</Text><View style={styles.wrapRow}>{(['Pantry', 'Fridge', 'Freezer', 'Spices'] as Storage[]).map((category) => <Pill key={category} label={category} selected={newItem.category === category} onPress={() => setNewItem((item) => ({ ...item, category }))} />)}</View><Pressable style={styles.primaryButton} onPress={addItem}><Text style={styles.primaryButtonText}>Add item</Text></Pressable></View></View></Modal>
+      <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><Text style={styles.modalTitle}>Add to inventory</Text><Pressable onPress={() => setShowAdd(false)}><Icon name="close" color={colors.muted} /></Pressable></View><TextInput autoFocus placeholder="Food name" value={newItem.name} onChangeText={(name) => setNewItem((item) => ({ ...item, name }))} style={styles.modalInput} /><TextInput placeholder="Quantity" value={newItem.quantity} onChangeText={(quantity) => setNewItem((item) => ({ ...item, quantity }))} style={styles.modalInput} /><Text style={styles.modalLabel}>Where does it live?</Text><View style={styles.wrapRow}>{(['Pantry', 'Fridge', 'Freezer', 'Spices'] as Storage[]).map((category) => <Pill key={category} label={category} selected={newItem.category === category} onPress={() => setNewItem((item) => ({ ...item, category }))} />)}</View><Text style={styles.modalLabel}>Food flag</Text><View style={styles.wrapRow}><Pill label="No flag" selected={newItemFlag === 'none'} onPress={() => setNewItemFlag('none')} /><Pill label="Limit · yellow" selected={newItemFlag === 'yellow'} tone="orange" onPress={() => setNewItemFlag('yellow')} /><Pill label="Avoid · red" selected={newItemFlag === 'red'} tone="red" onPress={() => setNewItemFlag('red')} /></View><Pressable style={styles.primaryButton} onPress={addItem}><Text style={styles.primaryButtonText}>Add item</Text></Pressable></View></View></Modal>
       <Modal visible={showScan} transparent animationType="slide" onRequestClose={() => setShowScan(false)}><View style={styles.modalBackdrop}><View style={styles.modalCard}><View style={styles.modalHeader}><Text style={styles.modalTitle}>Snapshot your food</Text><Pressable onPress={() => setShowScan(false)}><Icon name="close" color={colors.muted} /></Pressable></View><View style={styles.scanPreview}><Icon name="camera-outline" size={48} color={colors.orange} /><Text style={styles.scanPreviewTitle}>Camera + OCR ready</Text><Text style={styles.scanPreviewBody}>This first build uses a simulated scan so you can test the flow. Camera permissions and real item recognition plug in here next.</Text></View>{scanMessage ? <View style={styles.scanResult}><Icon name="checkmark-circle" color={colors.greenDark} size={21} /><Text style={styles.scanResultText}>{scanMessage}</Text></View> : null}<Pressable style={styles.primaryButton} onPress={runScan}><Icon name="scan-outline" size={18} color={colors.card} /><Text style={styles.primaryButtonText}>Scan a shelf photo</Text></Pressable></View></View></Modal>
     </SafeAreaView>
   );
@@ -312,6 +323,11 @@ const styles = StyleSheet.create({
   scanBannerIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
   scanTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   scanBody: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  flagLegend: { backgroundColor: colors.card, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18, borderWidth: 1, borderColor: colors.line },
+  flagLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  flagDot: { width: 8, height: 8, borderRadius: 4 },
+  flagLegendText: { color: colors.ink, fontSize: 10, fontWeight: '800' },
+  flagLegendHint: { color: colors.muted, fontSize: 9, marginLeft: 'auto' },
   inventoryCard: { backgroundColor: colors.card, borderRadius: 19, padding: 13, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, marginBottom: 10, gap: 11 },
   foodIcon: { width: 49, height: 49, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   foodEmoji: { fontSize: 25 },
@@ -321,6 +337,9 @@ const styles = StyleSheet.create({
   inventoryNutrition: { color: colors.muted, fontSize: 10, marginTop: 6 },
   avoidBadge: { backgroundColor: '#FDE6E4', paddingVertical: 3, paddingHorizontal: 6, borderRadius: 6 },
   avoidText: { color: colors.red, fontSize: 8, fontWeight: '900' },
+  limitBadge: { backgroundColor: '#FFF0D4' },
+  limitText: { color: '#9B6711' },
+  flagReason: { color: colors.muted, fontSize: 10, marginTop: 6 },
   alternative: { color: colors.greenDark, fontSize: 10, marginTop: 7, fontWeight: '700' },
   score: { alignItems: 'center', minWidth: 34 },
   scoreNumber: { color: colors.greenDark, fontWeight: '900', fontSize: 16 },
