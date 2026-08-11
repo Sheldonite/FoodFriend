@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Tab = 'Home' | 'Inventory' | 'Discover' | 'Reviews' | 'Settings';
 type Storage = 'Pantry' | 'Fridge' | 'Freezer' | 'Spices';
@@ -65,6 +66,8 @@ const reviews = [
   { id: '3', name: 'Taco Norte', type: 'Restaurant', rating: 3, note: 'Delicious, but the music can get loud after 7pm.', tags: ['Loud at night'] },
 ];
 
+const persistenceKey = '@foodfriend/local-state';
+
 const iconForTab: Record<Tab, keyof typeof Ionicons.glyphMap> = {
   Home: 'home-outline',
   Inventory: 'cube-outline',
@@ -107,6 +110,31 @@ function App() {
   const [sensoryMode, setSensoryMode] = useState(true);
   const [sensoryNeeds, setSensoryNeeds] = useState(['Low Lighting', 'Calm Atmosphere']);
   const [selectedAllergens, setSelectedAllergens] = useState(['Milk', 'Peanuts']);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(persistenceKey)
+      .then((saved) => {
+        if (!saved) return;
+        const state = JSON.parse(saved) as Partial<{
+          inventory: InventoryItem[];
+          sensoryMode: boolean;
+          sensoryNeeds: string[];
+          selectedAllergens: string[];
+        }>;
+        if (state.inventory) setInventory(state.inventory);
+        if (typeof state.sensoryMode === 'boolean') setSensoryMode(state.sensoryMode);
+        if (state.sensoryNeeds) setSensoryNeeds(state.sensoryNeeds);
+        if (state.selectedAllergens) setSelectedAllergens(state.selectedAllergens);
+      })
+      .catch(() => undefined)
+      .finally(() => setIsHydrated(true));
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    AsyncStorage.setItem(persistenceKey, JSON.stringify({ inventory, sensoryMode, sensoryNeeds, selectedAllergens })).catch(() => undefined);
+  }, [inventory, sensoryMode, sensoryNeeds, selectedAllergens, isHydrated]);
 
   const healthyCount = inventory.filter((item) => !item.avoid).length;
   const filteredInventory = useMemo(() => inventory.filter((item) => {

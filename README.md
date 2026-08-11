@@ -12,6 +12,7 @@ FoodFriend is a local-first Expo/React Native MVP for making healthy food decisi
 - Settings with sensory-friendly mode for parking, low lighting, loudness, and atmosphere.
 - Allergen customization with a 30-item starter list.
 - FoodFriend logo and iPhone-ready app icon wired into Expo configuration.
+- Local persistence for inventory, sensory mode, sensory needs, and allergen selections across browser refreshes and app restarts.
 
 ## Run it
 
@@ -27,6 +28,8 @@ npm run web
 ```
 
 Then open the local URL Expo prints. On iPhone, open it in Expo Go. The current scan and recommendation data are local demo data; the next build can connect them to a camera/OCR service, nutrition database, user accounts, and shared reviews.
+
+Local changes are stored on the current device. A hosted database is still needed later for login, cross-device sync, and shared reviews.
 
 ## GitHub Pages
 
