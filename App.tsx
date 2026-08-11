@@ -71,7 +71,7 @@ const initialInventory: InventoryItem[] = [
   { id: '2', name: 'Greek yogurt', category: 'Fridge', quantity: '3 cups', calories: 120, protein: 17, fiber: 0, healthScore: 87 },
   { id: '3', name: 'Chickpeas', category: 'Pantry', quantity: '2 cans', calories: 269, protein: 15, fiber: 12, healthScore: 92 },
   { id: '4', name: 'Frozen berries', category: 'Freezer', quantity: '1 bag', calories: 70, protein: 1, fiber: 4, healthScore: 94 },
-  { id: '5', name: 'White bread', category: 'Pantry', quantity: '½ loaf', calories: 266, protein: 9, fiber: 2, healthScore: 48, flag: 'red', flagReason: 'Refined grain', avoid: true, alternative: 'Whole grain bread' },
+  { id: '5', name: 'White bread', category: 'Pantry', quantity: '½ loaf', calories: 266, protein: 9, fiber: 2, healthScore: 48, alternative: 'Whole grain bread' },
   { id: '6', name: 'Smoked paprika', category: 'Spices', quantity: '1 jar', calories: 6, protein: 0, fiber: 1, healthScore: 85 },
 ];
 
@@ -153,7 +153,7 @@ function App() {
           sensoryNeeds: string[];
           selectedAllergens: string[];
         }>;
-        if (state.inventory) setInventory(state.inventory);
+        if (state.inventory) setInventory(state.inventory.map((item) => item.name.toLowerCase() === 'white bread' ? { ...item, avoid: false, flag: 'none', flagReason: undefined } : item));
         if (typeof state.sensoryMode === 'boolean') setSensoryMode(state.sensoryMode);
         if (state.sensoryNeeds) setSensoryNeeds(state.sensoryNeeds);
         if (state.selectedAllergens) setSelectedAllergens(state.selectedAllergens);
